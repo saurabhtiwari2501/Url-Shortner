@@ -45,30 +45,32 @@ const createUrl = async function (req, res) {
         const { longUrl } = data
 
         if (!isValidReqBody(data)) {
-            return res.status(400).send({ status: false, message: "Please provide data in request body" })
+            return res.status(201).send({ status: false, message: "Please provide data in request body" })
         }
 
         if (!longUrl || !isValid(longUrl)) {
-            return res.status(400).send({ status: false, message: "Invalid parameters...! Please provide longURL" })
+            return res.status(201).send({ status: false, message: "Invalid parameters...! Please provide longURL" })
         }
 
-        if (!url.isURL(longUrl)){
-             return res.status(400).send({ status: false, message: "please provide a valid long URL" })
+       let longURL = data.longUrl.toLowerCase()
+        if (!url.isURL(longUrl)) {
+            return res.status(201).send({ status: false, message: "please provide a valid long URL" })
         }
         // ---------- Getting Data from Cache
-        const cachedData = await GET_ASYNC(`${longUrl}`)
+        const cachedData = await GET_ASYNC(`${longURL}`)
         if (cachedData) {
             return res.status(200).send({ status: true, message: "Data from Cache", data: JSON.parse(cachedData) })
         }
 
         // ----------- Checking for duplicate  long Url
-        const duplicateUrl = await urlModel.findOne({ longUrl: longUrl }).select({ longUrl: 1, shortUrl: 1, urlCode: 1, _id: 0 })
+        const duplicateUrl = await urlModel.findOne({ longURL: longURL }).select({ longUrl: 1, shortUrl: 1, urlCode: 1, _id: 0 })
         if (duplicateUrl) {
-            await SETEX_ASYNC(`${longUrl}`, 30, JSON.stringify(longUrl))        // setting in cache
-            return res.status(200).send({ status: true, message: "Data from db", data: duplicateUrl })
+            await SETEX_ASYNC(`${longURL}`, 30, JSON.stringify(longURL))        // setting in cache
+            return res.status(201).send({ status: true, message: "Long URL already Exists", data: duplicateUrl })
         }
 
         // ---------- Generating urlCode and shortUrl
+
         const urlCode = shortId.generate()
         const shortUrl = `http://localhost:3000/${urlCode}`
 
@@ -77,8 +79,8 @@ const createUrl = async function (req, res) {
 
         // ----------- Creating data
         const savedData = await urlModel.create(data)
-        const resData = ({ longUrl: savedData.longUrl, shortUrl: savedData.shortUrl, urlCode: savedData.urlCode })
-        await SETEX_ASYNC(`${longUrl}`, 20, JSON.stringify(resData))    // setting data into cache after creating new data
+        const resData = ({ longURL: savedData.longURL, shortUrl: savedData.shortUrl, urlCode: savedData.urlCode })
+        await SETEX_ASYNC(`${longURL}`, 20, JSON.stringify(resData))    // setting data into cache after creating new data
         return res.status(201).send({ status: true, message: "Data Created", data: resData })
 
     } catch (err) {
